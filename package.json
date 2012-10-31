@@ -17,7 +17,9 @@
   "volo": {
     "baseUrl": "client/lib",
     "dependencies": {
-      "curl": "github:cujojs/curl/0.7.1"
+      "curl": "github:cujojs/curl/0.7.1",
+      "rest": "github:scothis/rest/v0.8.1",
+      "when": "github:cujojs/when/1.5.2"
     }
   }
 }

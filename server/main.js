@@ -1,7 +1,8 @@
 /*jshint es5:true, node:true*/
-var http, express, path, host, port, app;
+var http, fs, express, path, host, port, app;
 
 http = require('http');
+fs = require('fs');
 express = require('express');
 
 path = process.env.PWD + '/client';
@@ -37,7 +38,6 @@ app.param('secureRandom', function (req, res, next, val, param) {
  *
  * Scripted hello world, overview
  */
-
 // handled by `client/app/index.html`
 
 
@@ -46,7 +46,6 @@ app.param('secureRandom', function (req, res, next, val, param) {
  *
  * Static resources, shared across all projects
  */
-
 // handled by `app.use(express.static(path));` but with /app for custom code and /lib for libraries
 
 
@@ -63,13 +62,13 @@ app.param('secureRandom', function (req, res, next, val, param) {
  * - 200: the editor bootstrap
  * - 403: the secure random is unknown/untrusted
  */
-
 app.get('/:secureRandom/:filePath(*)', function (req, res) {
 	var securePath, filePath;
 	securePath = req.params.securePath;
 	filePath = '/' + req.params.filePath;
 	res.end('Editor: ' + filePath + ' within ' + securePath);
 });
+
 
 /*
  * GET http://localhost:7261/files/{secureRandom}/{filePath}
@@ -92,24 +91,40 @@ app.get('/:secureRandom/:filePath(*)', function (req, res) {
  * - 404: file does not exsist
  * - 406: not acceptable
  */
-
  app.get('/files/:secureRandom/:filePath(*)', function (req, res) {
 	var secureRandom, filePath;
 	secureRandom = req.params.secureRandom;
 	filePath = '/' + req.params.filePath;
-	if (req.accepts('application/vnd.scripted.raw') || req.accepts('application/vmc.scripted.directory')) {
-		res.end('File: ' + filePath + ' within ' + secureRandom);
-	}
-	else if (req.accepts('application/vnd.scripted.lint')) {
-		res.end('Lint: ' + filePath + ' within ' + secureRandom);
-	}
-	else if (req.accepts('application/vnd.scripted.dependencies')) {
-		res.end('Deps: ' + filePath + ' within ' + secureRandom);
-	}
-	else {
-		// not acceptable
-		res.status(406);
-	}
+	fs.stat(filePath, function (err, stats) {
+		if (err || (!stats.isDirectory() && !stats.isFile())) {
+			// TODO inspect error code before assuming a 404
+			// TODO determine impact of soft/hard links, sockets, etc
+			res.status(404);
+			res.end();
+		}
+		else if (stats.isDirectory()) {
+			fs.readdir(filePath, function (err, files) {
+				res.set('Content-Type', 'application/vnd.scripted.directory');
+				// TODO include stats/isDirectory/isFile for each file
+				res.end(JSON.stringify(files));
+			});
+		}
+		else if (req.accepts('application/vnd.scripted.raw')) {
+			res.set('Content-Type', 'application/vnd.scripted.raw');
+			res.sendfile(filePath);
+		}
+		else if (req.accepts('application/vnd.scripted.lint')) {
+			res.end('Lint: ' + filePath + ' within ' + secureRandom);
+		}
+		else if (req.accepts('application/vnd.scripted.dependencies')) {
+			res.end('Deps: ' + filePath + ' within ' + secureRandom);
+		}
+		else {
+			// not acceptable
+			res.status(406);
+			res.end();
+		}
+	});
 });
 
 
